@@ -19,7 +19,7 @@ HelpCrunch 管理画面 → Settings → Developers → Public API からAPIキ�
 
 ### 2. Claude Code に設定を追加
 
-`~/.claude/settings.json` に以下を追記:
+事前に AWS Secrets Manager にシークレットを作成してください。プレーンテキストまたは JSON 形式（`{"HELPCRUNCH_API_KEY":"xxx"}`）に対応しています。
 
 ```json
 {
@@ -28,11 +28,21 @@ HelpCrunch 管理画面 → Settings → Developers → Public API からAPIキ�
       "command": "npx",
       "args": ["-y", "github:ktokita-bengo4/helpcrunch-mcp"],
       "env": {
-        "HELPCRUNCH_API_KEY": "your-api-key-here"
+        "HELPCRUNCH_SECRET_NAME": "helpcrunch/api-key",
+        "AWS_REGION": "ap-northeast-1",
+        "AWS_PROFILE": "your-sso-profile"
       }
     }
   }
 }
 ```
+
+| 環境変数 | 説明 | デフォルト |
+|---------|------|-----------|
+| `HELPCRUNCH_SECRET_NAME` | Secrets Manager のシークレット名 | `helpcrunch/api-key` |
+| `AWS_REGION` | AWS リージョン | `ap-northeast-1` |
+| `AWS_PROFILE` | AWS SSO プロファイル名 | - |
+
+事前に `aws sso login --profile your-sso-profile` でログインが必要です。
 
 Claude Code を再起動すれば使えるようになります。
