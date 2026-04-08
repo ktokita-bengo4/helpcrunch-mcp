@@ -2,17 +2,33 @@
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { SecretsManagerClient, GetSecretValueCommand } from "@aws-sdk/client-secrets-manager";
 import { z } from "zod";
 import { HelpCrunchClient } from "./helpcrunch-client.js";
 
-const apiKey = process.env.HELPCRUNCH_API_KEY;
-if (!apiKey) {
-  console.error("Error: HELPCRUNCH_API_KEY environment variable is required.");
-  console.error("Get your API key from HelpCrunch Settings → Developers → Public API");
-  process.exit(1);
+async function getApiKey(): Promise<string> {
+  const secretName = process.env.HELPCRUNCH_SECRET_NAME ?? "helpcrunch/api-key";
+  const region = process.env.AWS_REGION ?? "ap-northeast-1";
+  console.error(`Fetching API key from AWS Secrets Manager: ${secretName}`);
+
+  const client = new SecretsManagerClient({ region });
+  const res = await client.send(new GetSecretValueCommand({ SecretId: secretName }));
+
+  if (!res.SecretString) {
+    throw new Error(`Secret "${secretName}" has no string value`);
+  }
+
+  // JSON形式 {"HELPCRUNCH_API_KEY":"xxx"} またはプレーンテキストに対応
+  try {
+    const parsed = JSON.parse(res.SecretString);
+    if (parsed.HELPCRUNCH_API_KEY) return parsed.HELPCRUNCH_API_KEY;
+  } catch {
+    // プレーンテキストとして扱う
+  }
+  return res.SecretString;
 }
 
-const client = new HelpCrunchClient(apiKey);
+let client: HelpCrunchClient;
 
 const server = new McpServer({
   name: "helpcrunch",
@@ -177,6 +193,9 @@ server.tool(
 );
 
 async function main() {
+  const apiKey = await getApiKey();
+  client = new HelpCrunchClient(apiKey);
+
   const transport = new StdioServerTransport();
   await server.connect(transport);
   console.error("HelpCrunch MCP server started");
